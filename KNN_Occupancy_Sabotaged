@@ -1,0 +1,123 @@
+---
+  title: "Assigment - kNN DIY"
+author:
+  - name author here - TICE97
+- name reviewer here - JuniorB2
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output:
+  html_notebook:
+  toc: true
+toc_depth: 2
+---
+  
+  
+  ```{r}
+library(tidyverse)
+library(googlesheets4)
+library(class)
+library(caret)
+```
+
+---
+  
+  Choose a suitable dataset from [this](https://github.com/HAN-M3DM-Data-Mining/assignments/tree/master/datasets) folder and train  your own kNN model. Follow all the steps from the CRISP-DM model.
+
+Business Understanding
+Chosen dataset: Occupancy
+The aim of this model is the reducing of energy waste.
+
+
+Data Understanding
+There are 6 usable variables and 8143 rows
+Occupancy is our target variable, the other 5 will be used to train our model
+The date will be left out since it is not relevant for this assignment.
+```{r}
+
+url <- "https://raw.githubusercontent.com/HAN-M3DM-Data-Mining/assignments/master/datasets/KNN-occupancy.csv"
+rawDF <- read_csv(url)
+str(rawDF)
+
+```
+The date column will be removed and stored in a new output called CleanDF. Also, it will be excluded to the 6th column.
+```{r}
+
+cleanDF = rawDF[-1]
+summary(cleanDF[-6])
+
+```
+We can see that the ranges are very different, therefore they should be normalized in data prep. Also, we will check the occurrences of the target variable. We saw in the column above that occupancy can be a '0' or '1'. This needs to be labeled to 0=Not occupied and 1=Occupied
+```{r}
+cleandDF <- cleanDF %>% 
+  mutate(Occupancy = factor(ifelse(cleanDF$Occupancy == 0, "not occupied", "occupied")))
+
+summary(cleanDF)
+```
+```{r}
+colSums(is.na(cleanDF))
+```
+```{r}
+count_occupancy = table(cleanDF$Occupancy) # for the counts in absolute terms
+print('The observations of the labels where 0 is <not occupied> and 1 is <occupied> are:' )
+```
+```{r}
+print(count_occupancy)
+```
+```{r}
+propOccupancy = round(prop.table(count_occupancy) * 100 , digits = 2) # to see the proportion of not occupied rooms in percentage terms
+
+cat("\n",
+    toString(propOccupancy[1]),
+    "%",
+    sep='')
+```
+```{r}
+cat("\n",#to see what the room occupancy percentage is
+    toString(propOccupancy[2]),
+    "%",
+    sep='')
+```
+
+## Data Preparation
+```{r} 
+#lets give them labels
+cleanDF$Occupancy = factor(cleanDF$Occupancy, levels = c(0, 1), labels = c("occupied", "not occupied")) %>% relevel("not occupied")
+head(cleanDF)
+```
+
+
+```{r}
+#Now we need to normalize the data to make all the variables equally weighted
+
+normalize = function(x) { # Function takes in a vector
+  return ((x - min(x)) / (max(x) - min(x))) # distance of item value - minimum vector value divided by the range of all vector values
+}
+```
+
+```{r}
+#Next function will be applied to all the variables
+cleanDF_n = sapply(cleanDF[-6], normalize) %>% as.data.frame()
+
+summary(cleanDF_n)
+
+#they are now all between ranges from 0 to 1
+```
+Now we will make a training set and a test set
+```{r}
+trainDF_feat = cleanDF_n[1:7000,]
+testDF_feat = cleanDF_n[7001:8143,]
+
+trainDF_labels = cleanDF[1:7000, 6]
+testDF_labels = cleanDF[7001:8143, 6]
+```
+
+Modeling
+Here we will create a KNN model
+```{r}
+cleanDF_test_pred = knn(train = as.matrix(trainDF_feat), test = as.matrix(testDF_feat), cl = as.matrix(trainDF_labels), k = 1)
+head(cleanDF_test_pred, 10)
+```
+Evaluation
+```{r}
+confusionMatrix(cleanDF_test_pred, testDF_labels[[1]], positive = "occupied", dnn = c("Prediction", "Actual"))
+```
+
